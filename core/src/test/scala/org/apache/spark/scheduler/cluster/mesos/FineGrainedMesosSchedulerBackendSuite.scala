@@ -43,7 +43,7 @@ import org.apache.spark.scheduler.cluster.ExecutorInfo
 
 class FineGrainedMesosSchedulerBackendSuite
   extends FunSuite
-  with MesosSchedulerBackendSuiteHelper
+  with MesosSchedulerBackendSuiteHelper[FineGrainedMesosSchedulerBackend]
   with LocalSparkContext
   with MockitoSugar {
 
@@ -52,12 +52,11 @@ class FineGrainedMesosSchedulerBackendSuite
     new FineGrainedMesosSchedulerBackend(taskScheduler, taskScheduler.sc, "master")
   }
 
-  protected def makeTestOffers(sc: SparkContext): (Offer, Offer, Offer, Offer) = {
-    val (minMem, minCpu) = minMemMinCPU(sc)
+  protected def makeTestOffers(minMem: Int, minCpu: Int): (Offer, Offer, Offer, Offer) = {
     val goodOffer1 = makeOffer("o1", "s1", minMem,     minCpu)
     val badOffer1  = makeOffer("o2", "s2", minMem - 1, minCpu)      // memory will be too small.
     val goodOffer2 = makeOffer("o3", "s3", minMem,     minCpu)
-    val badOffer2  = makeOffer("o4", "s4", minMem,     minCpu - 1)  // CPUs will be too small.
+    val badOffer2  = makeOffer("o4", "s4", minMem,     minCpu - 2)  // CPUs will be too small.
     (goodOffer1, badOffer1, goodOffer2, badOffer2)
   }
 
@@ -104,7 +103,7 @@ class FineGrainedMesosSchedulerBackendSuite
     Seq(Seq(new TaskDescription(expectedTaskId1, 0, "s1", "n1", 0, ByteBuffer.wrap(new Array[Byte](0)))))
 
   protected def offerResourcesHelper():
-      (CommonMesosSchedulerBackend, SchedulerDriver, ArgumentCaptor[util.Collection[TaskInfo]], JArrayList[Offer]) = {
+      (FineGrainedMesosSchedulerBackend, SchedulerDriver, ArgumentCaptor[util.Collection[TaskInfo]], JArrayList[Offer]) = {
 
     val (backend, driver) = makeBackendAndDriver()
     val taskScheduler = backend.scheduler
@@ -115,19 +114,21 @@ class FineGrainedMesosSchedulerBackendSuite
     sc.listenerBus.post(
       SparkListenerExecutorAdded(anyLong, "s1", new ExecutorInfo("host_s1", 2, Map.empty)))
 
-    val (goodOffer1, badOffer1, goodOffer2, badOffer2) = makeTestOffers(sc)
+    val (minMem, minCpu) = minMemMinCPU(sc)
+    val (goodOffer1, badOffer1, goodOffer2, badOffer2) = makeTestOffers(minMem, minCpu)
     val mesosOffers = makeOffersList(goodOffer1, badOffer1, goodOffer2, badOffer2)
+    val cores = minCpu - backend.executorCores
 
     val expectedWorkerOffers = new ArrayBuffer[WorkerOffer](2)
     expectedWorkerOffers.append(new WorkerOffer(
       goodOffer1.getSlaveId.getValue,
       goodOffer1.getHostname,
-      2
+      cores
     ))
     expectedWorkerOffers.append(new WorkerOffer(
       goodOffer2.getSlaveId.getValue,
       goodOffer2.getHostname,
-      2
+      cores
     ))
 
     when(taskScheduler.resourceOffers(expectedWorkerOffers)).thenReturn(expectedTaskDescriptions)
@@ -158,9 +159,8 @@ class FineGrainedMesosSchedulerBackendSuite
     assert(taskInfo.getName === "n1")
     val cpus = taskInfo.getResourcesList.get(0)
     assert(cpus.getName === "cpus")
-    val actual = cpus.getScalar.getValue - 2.0
-    val delta = 0.00001
-    assert(actual >= - delta && actual <= delta)
+    val actualCpus = cpus.getScalar.getValue.toInt
+    assert(actualCpus === 1)
     assert(taskInfo.getSlaveId.getValue === "s1")
   }
 
@@ -213,11 +213,12 @@ class FineGrainedMesosSchedulerBackendSuite
     resetTaskScheduler(taskScheduler)
     reset(driver)
 
+    val (minMem, minCpu) = minMemMinCPU(taskScheduler.sc)
     val expectedWorkerOffers = new ArrayBuffer[WorkerOffer](1)
     expectedWorkerOffers.append(new WorkerOffer(
       goodOffer1.getSlaveId.getValue,
       goodOffer1.getHostname,
-      2
+      minCpu - backend.executorCores
     ))
 
     when(taskScheduler.resourceOffers(expectedWorkerOffers)).thenReturn(expectedTaskDescriptions)

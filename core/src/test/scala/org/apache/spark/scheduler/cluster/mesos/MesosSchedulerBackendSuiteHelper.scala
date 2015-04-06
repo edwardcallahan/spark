@@ -35,11 +35,11 @@ import org.scalatest.mock.MockitoSugar
 
 import scala.collection.mutable
 
-trait MesosSchedulerBackendSuiteHelper {
+trait MesosSchedulerBackendSuiteHelper[MSB <: CommonMesosSchedulerBackend] {
   self: FunSuite with LocalSparkContext with MockitoSugar =>
 
   protected def makeTestMesosSchedulerBackend(
-      taskScheduler: TaskSchedulerImpl): CommonMesosSchedulerBackend
+      taskScheduler: TaskSchedulerImpl): MSB
 
   protected def makeOffer(offerId: String, slaveId: String, mem: Int, cpu: Int) = {
     val builder = Offer.newBuilder()
@@ -99,7 +99,7 @@ trait MesosSchedulerBackendSuiteHelper {
     (sc, taskScheduler, driver)
   }
 
-  protected def makeBackendAndDriver(): (CommonMesosSchedulerBackend, SchedulerDriver) = {
+  protected def makeBackendAndDriver(): (MSB, SchedulerDriver) = {
     val (sc, taskScheduler, driver) = makeMockEnvironment()
     val backend = makeTestMesosSchedulerBackend(taskScheduler)
     backend.driver = driver

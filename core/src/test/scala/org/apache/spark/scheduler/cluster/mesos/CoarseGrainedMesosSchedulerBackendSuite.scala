@@ -37,7 +37,7 @@ import scala.collection.mutable
 
 class CoarseGrainedMesosSchedulerBackendSuite
   extends FunSuite
-  with MesosSchedulerBackendSuiteHelper
+  with MesosSchedulerBackendSuiteHelper[CoarseGrainedMesosSchedulerBackend]
   with LocalSparkContext
   with MockitoSugar {
 

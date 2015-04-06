@@ -57,6 +57,8 @@ private[spark] class FineGrainedMesosSchedulerBackend(
 
   var classLoader: ClassLoader = null
 
+  val executorCores = sparkContext.conf.getInt("spark.mesos.executor.cores", 1)
+
   // The listener bus to publish executor added/removed events.
   val listenerBus = sparkContext.listenerBus
 
@@ -88,7 +90,7 @@ private[spark] class FineGrainedMesosSchedulerBackend(
       .setName("cpus")
       .setType(Value.Type.SCALAR)
       .setScalar(Value.Scalar.newBuilder()
-        .setValue(scheduler.CPUS_PER_TASK).build())
+        .setValue(executorCores).build())
       .build()
     val memory = Resource.newBuilder()
       .setName("mem")
@@ -152,17 +154,15 @@ private[spark] class FineGrainedMesosSchedulerBackend(
         val mem = getResource(o.getResourcesList, "mem")
         val cpus = getResource(o.getResourcesList, "cpus")
         val minMemory = MemoryUtils.calculateTotalMemory(sparkContext)
-        // TODO(pwendell): Should below be 1 + scheduler.CPUS_PER_TASK?
-        (mem >= minMemory && cpus >= 2 * scheduler.CPUS_PER_TASK) ||
+        (mem >= minMemory && cpus >= executorCores + scheduler.CPUS_PER_TASK) ||
         (slaveHasExecutor(slaveId) && cpus >= scheduler.CPUS_PER_TASK)
       }
 
       val workerOffers = usableOffers.map { o =>
         // If the executor doesn't exist yet, subtract CPU for executor
-        // TODO(pwendell): Should below just subtract "1"?
         val slaveId = o.getSlaveId.getValue
         val cpus1 = getResource(o.getResourcesList, "cpus").toInt
-        val cpus = if (slaveHasExecutor(slaveId)) cpus1 else cpus1 - scheduler.CPUS_PER_TASK
+        val cpus = if (slaveHasExecutor(slaveId)) cpus1 else cpus1 - executorCores
         new WorkerOffer(
           o.getSlaveId.getValue,
           o.getHostname,
@@ -220,7 +220,7 @@ private[spark] class FineGrainedMesosSchedulerBackend(
     val cpuResource = Resource.newBuilder()
       .setName("cpus")
       .setType(Value.Type.SCALAR)
-      .setScalar(Value.Scalar.newBuilder().setValue(scheduler.CPUS_PER_TASK).build())
+      .setScalar(Value.Scalar.newBuilder().setValue(executorCores).build())
       .build()
     MesosTaskInfo.newBuilder()
       .setTaskId(taskId)
