@@ -27,7 +27,7 @@ import org.apache.spark.SparkException
 import org.apache.spark.annotation.InterfaceStability
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, InterpretedOrdering}
 import org.apache.spark.sql.catalyst.parser.{CatalystSqlParser, LegacyTypeStringParser}
-import org.apache.spark.sql.catalyst.util.quoteIdentifier
+import org.apache.spark.sql.catalyst.util.{escapeSingleQuotedString, quoteIdentifier}
 import org.apache.spark.util.Utils
 
 /**
@@ -360,6 +360,16 @@ case class StructType(fields: Array[StructField]) extends DataType with Seq[Stru
     s"STRUCT<${fieldTypes.mkString(", ")}>"
   }
 
+  /**
+   * Returns a string containing a schema in DDL format. For example, the following value:
+   * `StructType(Seq(StructField("eventId", IntegerType), StructField("s", StringType)))`
+   * will be converted to `eventId` INT, `s` STRING.
+   * The returned DDL schema can be used in a table creation.
+   *
+   * @since 2.4.0
+   */
+  def toDDL: String = fields.map(_.toDDL).mkString(",")
+
   private[sql] override def simpleString(maxNumberFields: Int): String = {
     val builder = new StringBuilder
     val fieldTypes = fields.take(maxNumberFields).map {
@@ -433,6 +443,8 @@ object StructType extends AbstractDataType {
   /**
    * Creates StructType for a given DDL-formatted string, which is a comma separated list of field
    * definitions, e.g., a INT, b STRING.
+   *
+   * @since 2.2.0
    */
   def fromDDL(ddl: String): StructType = CatalystSqlParser.parseTableSchema(ddl)
 

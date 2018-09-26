@@ -32,7 +32,7 @@ private[spark] class KubernetesTestComponents(defaultClient: DefaultKubernetesCl
   val namespaceOption = Option(System.getProperty("spark.kubernetes.test.namespace"))
   val hasUserSpecifiedNamespace = namespaceOption.isDefined
   val namespace = namespaceOption.getOrElse(UUID.randomUUID().toString.replaceAll("-", ""))
-  private val serviceAccountName =
+  val serviceAccountName =
     Option(System.getProperty("spark.kubernetes.test.serviceAccountName"))
       .getOrElse("default")
   val kubernetesClient = defaultClient.inNamespace(namespace)
@@ -62,7 +62,6 @@ private[spark] class KubernetesTestComponents(defaultClient: DefaultKubernetesCl
     new SparkAppConf()
       .set("spark.master", s"k8s://${kubernetesClient.getMasterUrl}")
       .set("spark.kubernetes.namespace", namespace)
-      .set("spark.executor.memory", "500m")
       .set("spark.executor.cores", "1")
       .set("spark.executors.instances", "1")
       .set("spark.app.name", "spark-test-app")
