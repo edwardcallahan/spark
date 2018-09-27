@@ -21,27 +21,22 @@ import java.nio.file.{Path, Paths}
 import java.util.UUID
 import java.util.regex.Pattern
 
-import scala.collection.JavaConverters._
-
 import com.google.common.io.PatternFilenameFilter
 import io.fabric8.kubernetes.api.model.Pod
-import io.fabric8.kubernetes.client.{KubernetesClientException, Watcher}
-import io.fabric8.kubernetes.client.Watcher.Action
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Matchers, Tag}
 import org.scalatest.concurrent.{Eventually, PatienceConfiguration}
 import org.scalatest.time.{Minutes, Seconds, Span}
+import scala.collection.JavaConverters._
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.deploy.k8s.integrationtest.TestConfig._
 import org.apache.spark.deploy.k8s.integrationtest.backend.{IntegrationTestBackend, IntegrationTestBackendFactory}
-import org.apache.spark.internal.Logging
 
 object NoDCOS extends Tag("NO_DCOS")
 
 private[spark] class KubernetesSuite extends SparkFunSuite
   with BeforeAndAfterAll with BeforeAndAfter with BasicTestsSuite with SecretsTestsSuite
-  with PythonTestsSuite with ClientModeTestsSuite
-  with Logging with Eventually with Matchers {
+  with PythonTestsSuite with ClientModeTestsSuite {
 
   import KubernetesSuite._
 
@@ -69,7 +64,6 @@ private[spark] class KubernetesSuite extends SparkFunSuite
     s"${(1024 + memOverheadConstant*1024 + additionalMemory).toInt}Mi"
 
   override def beforeAll(): Unit = {
-    super.beforeAll()
     // The scalatest-maven-plugin gives system properties that are referenced but not set null
     // values. We need to remove the null-value properties before initializing the test backend.
     val nullValueProperties = System.getProperties.asScala
@@ -101,11 +95,7 @@ private[spark] class KubernetesSuite extends SparkFunSuite
   }
 
   override def afterAll(): Unit = {
-    try {
-      testBackend.cleanUp()
-    } finally {
-      super.afterAll()
-    }
+    testBackend.cleanUp()
   }
 
   before {
@@ -116,7 +106,6 @@ private[spark] class KubernetesSuite extends SparkFunSuite
       .set("spark.kubernetes.driver.pod.name", driverPodName)
       .set("spark.kubernetes.driver.label.spark-app-locator", appLocator)
       .set("spark.kubernetes.executor.label.spark-app-locator", appLocator)
-     // .set("spark.kubernetes.container.image.pullPolicy", "Always")
     if (!kubernetesTestComponents.hasUserSpecifiedNamespace) {
       kubernetesTestComponents.createNamespace()
     }
@@ -126,7 +115,7 @@ private[spark] class KubernetesSuite extends SparkFunSuite
     if (!kubernetesTestComponents.hasUserSpecifiedNamespace) {
       kubernetesTestComponents.deleteNamespace()
     }
-   // deleteDriverPod()
+    deleteDriverPod()
   }
 
   protected def runSparkPiAndVerifyCompletion(
@@ -231,28 +220,17 @@ private[spark] class KubernetesSuite extends SparkFunSuite
       .getItems
       .get(0)
     driverPodChecker(driverPod)
-    val execPods = scala.collection.mutable.Map[String, Pod]()
-    val execWatcher = kubernetesTestComponents.kubernetesClient
+
+    val executorPods = kubernetesTestComponents.kubernetesClient
       .pods()
       .withLabel("spark-app-locator", appLocator)
       .withLabel("spark-role", "executor")
-      .watch(new Watcher[Pod] {
-        logInfo("Beginning watch of executors")
-        override def onClose(cause: KubernetesClientException): Unit =
-          logInfo("Ending watch of executors")
-        override def eventReceived(action: Watcher.Action, resource: Pod): Unit = {
-          val name = resource.getMetadata.getName
-          action match {
-            case Action.ADDED | Action.MODIFIED =>
-              execPods(name) = resource
-            case Action.DELETED | Action.ERROR =>
-              execPods.remove(name)
-          }
-        }
-      })
-    Eventually.eventually(TIMEOUT, INTERVAL) { execPods.values.nonEmpty should be (true) }
-    execWatcher.close()
-    execPods.values.foreach(executorPodChecker(_))
+      .list()
+      .getItems
+    executorPods.asScala.foreach { pod =>
+      executorPodChecker(pod)
+    }
+
     Eventually.eventually(TIMEOUT, INTERVAL) {
       expectedLogOnCompletion.foreach { e =>
         assert(kubernetesTestComponents.kubernetesClient
@@ -263,6 +241,7 @@ private[spark] class KubernetesSuite extends SparkFunSuite
       }
     }
   }
+
   protected def doBasicDriverPodCheck(driverPod: Pod): Unit = {
     assert(driverPod.getMetadata.getName === driverPodName)
     assert(driverPod.getSpec.getContainers.get(0).getImage === image)
