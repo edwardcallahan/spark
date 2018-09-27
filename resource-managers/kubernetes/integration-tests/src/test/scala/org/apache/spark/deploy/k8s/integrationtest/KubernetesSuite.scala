@@ -116,7 +116,7 @@ private[spark] class KubernetesSuite extends SparkFunSuite
       .set("spark.kubernetes.driver.pod.name", driverPodName)
       .set("spark.kubernetes.driver.label.spark-app-locator", appLocator)
       .set("spark.kubernetes.executor.label.spark-app-locator", appLocator)
-      .set("spark.kubernetes.container.image.pullPolicy", "Always")
+     // .set("spark.kubernetes.container.image.pullPolicy", "Always")
     if (!kubernetesTestComponents.hasUserSpecifiedNamespace) {
       kubernetesTestComponents.createNamespace()
     }
@@ -126,7 +126,7 @@ private[spark] class KubernetesSuite extends SparkFunSuite
     if (!kubernetesTestComponents.hasUserSpecifiedNamespace) {
       kubernetesTestComponents.deleteNamespace()
     }
-    deleteDriverPod()
+   // deleteDriverPod()
   }
 
   protected def runSparkPiAndVerifyCompletion(
