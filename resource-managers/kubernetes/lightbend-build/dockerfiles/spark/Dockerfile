@@ -33,7 +33,7 @@ RUN set -ex && \
     apt-get -y install bash libc6 && \
     apt-get -y install curl wget && \
     mkdir -p /opt/spark && \
-    mkdir -p /opt/spark/work-dir \
+    mkdir -p /opt/spark/work-dir && \
     touch /opt/spark/RELEASE && \
     rm /bin/sh && \
     ln -sv /bin/bash /bin/sh && \
@@ -44,6 +44,7 @@ COPY bin /opt/spark/bin
 COPY sbin /opt/spark/sbin
 COPY ${img_path}/spark/entrypoint.sh /opt/
 COPY examples /opt/spark/examples
+COPY kubernetes/tests /opt/spark/tests
 COPY data /opt/spark/data
 
 # Add Tini
