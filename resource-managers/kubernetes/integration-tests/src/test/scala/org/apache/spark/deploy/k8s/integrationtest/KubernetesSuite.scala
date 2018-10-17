@@ -36,6 +36,8 @@ import org.apache.spark.deploy.k8s.integrationtest.TestConfig._
 import org.apache.spark.deploy.k8s.integrationtest.backend.{IntegrationTestBackend, IntegrationTestBackendFactory}
 import org.apache.spark.internal.Logging
 
+object NoDCOS extends Tag("NO_DCOS")
+
 private[spark] class KubernetesSuite extends SparkFunSuite
   with BeforeAndAfterAll with BeforeAndAfter with BasicTestsSuite with SecretsTestsSuite
   with PythonTestsSuite with ClientModeTestsSuite

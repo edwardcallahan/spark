@@ -15,11 +15,10 @@
 # limitations under the License.
 #
 
-FROM openjdk:8-alpine
+FROM lightbend/custom-ubuntu-openjdk8:16.04
 
 ARG spark_jars=jars
 ARG img_path=kubernetes/dockerfiles
-ARG k8s_tests=kubernetes/tests
 
 # Before building the docker image, first build and make a Spark distribution following
 # the instructions in http://spark.apache.org/docs/latest/building-spark.html.
@@ -29,14 +28,15 @@ ARG k8s_tests=kubernetes/tests
 # docker build -t spark:latest -f kubernetes/dockerfiles/spark/Dockerfile .
 
 RUN set -ex && \
-    apk upgrade --no-cache && \
-    apk add --no-cache bash tini libc6-compat linux-pam && \
+    apt-get -y update && \
+    apt-get -y upgrade && \
+    apt-get -y install bash libc6 && \
+    apt-get -y install curl wget && \
     mkdir -p /opt/spark && \
     mkdir -p /opt/spark/work-dir && \
     touch /opt/spark/RELEASE && \
     rm /bin/sh && \
     ln -sv /bin/bash /bin/sh && \
-    echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su && \
     chgrp root /etc/passwd && chmod ug+rw /etc/passwd
 
 RUN wget http://central.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.3.1/jmx_prometheus_javaagent-0.3.1.jar -O /jmx_prometheus_javaagent-0.3.1.jar
@@ -47,8 +47,13 @@ COPY bin /opt/spark/bin
 COPY sbin /opt/spark/sbin
 COPY ${img_path}/spark/entrypoint.sh /opt/
 COPY examples /opt/spark/examples
-COPY ${k8s_tests} /opt/spark/tests
+COPY kubernetes/tests /opt/spark/tests
 COPY data /opt/spark/data
+
+# Add Tini
+ENV TINI_VERSION v0.18.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /sbin/tini
+RUN chmod +x /sbin/tini
 
 ENV SPARK_HOME /opt/spark
 

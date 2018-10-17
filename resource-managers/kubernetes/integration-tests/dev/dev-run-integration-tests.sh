@@ -27,6 +27,7 @@ SPARK_MASTER=
 NAMESPACE=
 SERVICE_ACCOUNT=
 INCLUDE_TAGS="k8s"
+EXTRA_JARS=
 EXCLUDE_TAGS=
 
 # Parse arguments
@@ -68,6 +69,10 @@ while (( "$#" )); do
       EXCLUDE_TAGS="$2"
       shift
       ;;
+    --extra-jars)
+      EXTRA_JARS="$2"
+      shift
+      ;;
     *)
       break
       ;;
@@ -101,6 +106,11 @@ fi
 if [ -n $EXCLUDE_TAGS ];
 then
   properties=( ${properties[@]} -Dtest.exclude.tags=$EXCLUDE_TAGS )
+fi
+
+if [ -n $EXTRA_JARS ];
+then
+  properties=( ${properties[@]} -Dspark.kubernetes.test.extraJars=$EXTRA_JARS )
 fi
 
 $TEST_ROOT_DIR/build/mvn integration-test -f $TEST_ROOT_DIR/pom.xml -pl resource-managers/kubernetes/integration-tests -am -Pkubernetes -Phadoop-2.7 ${properties[@]}
